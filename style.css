@@ -3,7 +3,7 @@
     position: fixed;
     top: 80px;
     right: 20px;
-    width: 460px;
+    width: 720px;
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 120px);
     overflow: auto;
@@ -16,8 +16,11 @@
     font-size: 14px;
 }
 #st-chatu8-comfy-settings-panel .cc-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; border-bottom: 1px solid var(--SmartThemeBorderColor, #444);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--SmartThemeBorderColor, #444);
 }
 #st-chatu8-comfy-settings-panel .cc-header h2 { margin: 0; font-size: 16px; }
 #st-chatu8-comfy-settings-panel .cc-close { cursor: pointer; font-size: 20px; opacity: 0.7; }
@@ -25,30 +28,101 @@
 #st-chatu8-comfy-settings-panel .cc-body { padding: 12px 16px; }
 #st-chatu8-comfy-settings-panel section { margin-bottom: 14px; }
 #st-chatu8-comfy-settings-panel section h3 {
-    margin: 8px 0; font-size: 13px; opacity: 0.85; border-bottom: 1px dashed var(--SmartThemeBorderColor, #555); padding-bottom: 4px;
+    margin: 8px 0;
+    font-size: 13px;
+    opacity: 0.85;
+    border-bottom: 1px dashed var(--SmartThemeBorderColor, #555);
+    padding-bottom: 4px;
 }
-#st-chatu8-comfy-settings-panel .cc-field { margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
-#st-chatu8-comfy-settings-panel .cc-field label { font-size: 12px; opacity: 0.8; }
-#st-chatu8-comfy-settings-panel .cc-field.cc-row { flex-direction: row; align-items: center; gap: 8px; }
+#st-chatu8-comfy-settings-panel label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    opacity: 0.9;
+}
+#st-chatu8-comfy-settings-panel .cc-check {
+    flex-direction: row;
+    align-items: center;
+    margin: 8px 0;
+}
+#st-chatu8-comfy-settings-panel .cc-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+}
 #st-chatu8-comfy-settings-panel .cc-input,
 #st-chatu8-comfy-settings-panel .cc-textarea,
 #st-chatu8-comfy-settings-panel .cc-select {
-    width: 100%; box-sizing: border-box; padding: 6px 8px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
     background: var(--SmartThemeBlurTintColor, #2a2d3f);
     color: var(--SmartThemeBodyColor, #e0e0e0);
     border: 1px solid var(--SmartThemeBorderColor, #555);
     border-radius: 4px;
     font: inherit;
 }
-#st-chatu8-comfy-settings-panel .cc-textarea.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
-#st-chatu8-comfy-settings-panel .cc-grid {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+#st-chatu8-comfy-settings-panel .cc-textarea.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
 }
+#st-chatu8-comfy-settings-panel .cc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin: 8px 0;
+}
+#st-chatu8-comfy-settings-panel .cc-grid.two { grid-template-columns: 1fr 1fr; }
+#st-chatu8-comfy-settings-panel .cc-grid.three { grid-template-columns: 1fr 1fr 1fr; }
 #st-chatu8-comfy-settings-panel .cc-btn {
-    padding: 6px 12px; border-radius: 4px; border: 1px solid var(--SmartThemeBorderColor, #555);
-    background: var(--SmartThemeBlurTintColor, #2a2d3f); color: inherit; cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--SmartThemeBorderColor, #555);
+    background: var(--SmartThemeBlurTintColor, #2a2d3f);
+    color: inherit;
+    cursor: pointer;
+    white-space: nowrap;
 }
 #st-chatu8-comfy-settings-panel .cc-btn.primary { background: #4a78ff; color: #fff; border-color: #4a78ff; }
 #st-chatu8-comfy-settings-panel .cc-btn.danger { background: #d9534f; color: #fff; border-color: #d9534f; }
-#st-chatu8-comfy-settings-panel .cc-footer { padding: 10px 16px; border-top: 1px solid var(--SmartThemeBorderColor, #444); display: flex; justify-content: flex-end; }
-#st-chatu8-comfy-settings-panel .cc-row .cc-input { flex: 1; }
+#st-chatu8-comfy-settings-panel .cc-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--SmartThemeBorderColor, #444);
+    display: flex;
+    justify-content: flex-end;
+}
+#st-chatu8-comfy-settings-panel .cc-row .cc-input,
+#st-chatu8-comfy-settings-panel .cc-row .cc-select { flex: 1; }
+#st-chatu8-comfy-settings-panel .cc-help {
+    opacity: 0.7;
+    font-size: 12px;
+    margin: 6px 0 0;
+    line-height: 1.5;
+}
+.st-chatu8-comfy-image {
+    display: block;
+    max-width: 100%;
+    border-radius: 6px;
+    margin: 8px 0;
+    cursor: zoom-in;
+}
+@media (max-width: 720px) {
+    #st-chatu8-comfy-settings-panel.st-chatu8-comfy-panel {
+        left: 8px;
+        right: 8px;
+        top: 8px;
+        width: auto;
+        max-width: none;
+        max-height: calc(100vh - 16px);
+    }
+    #st-chatu8-comfy-settings-panel .cc-grid,
+    #st-chatu8-comfy-settings-panel .cc-grid.two,
+    #st-chatu8-comfy-settings-panel .cc-grid.three {
+        grid-template-columns: 1fr;
+    }
+    #st-chatu8-comfy-settings-panel .cc-row {
+        flex-wrap: wrap;
+    }
+}
