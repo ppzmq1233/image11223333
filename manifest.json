@@ -1,0 +1,13 @@
+{
+    "display_name": "st-chatu8-comfy",
+    "loading_order": 9,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "based on st-chatu8 by 从前跟你一样",
+    "version": "0.1.0",
+    "homePage": "https://github.com/damoshen123/st-chatu8",
+    "auto_update": true,
+    "updata": "0.1.0\n基于 st-chatu8 拆分出的精简 ComfyUI 连接插件，仅保留「主要设置 + ComfyUI」相关核心：聊天标记触发、工作流预设、生图轮询、图片插入楼层。\nUI 为重新实现，便于二次开发做更复杂的酒馆内生图效果。"
+}
