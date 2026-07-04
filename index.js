@@ -56,6 +56,24 @@ function defaultSettings() {
         startTag: 'image###',
         endTag: '###image',
         negativePrompt: '',
+        fixedPromptPrefix: '',
+        fixedPromptSuffix: '',
+        qualityPositive: 'best quality, amazing quality, very aesthetic, absurdres',
+        qualityNegative: 'bad proportions, out of focus, username, text, bad anatomy, lowres, worst quality, watermark, cropped, deformed, extra limbs, missing fingers, blurry, low quality',
+        enableQualityPositive: true,
+        enableQualityNegative: true,
+        promptProfiles: {
+            '默认': {
+                fixedPromptPrefix: '',
+                fixedPromptSuffix: '',
+                negativePrompt: '',
+                qualityPositive: 'best quality, amazing quality, very aesthetic, absurdres',
+                qualityNegative: 'bad proportions, out of focus, username, text, bad anatomy, lowres, worst quality, watermark, cropped, deformed, extra limbs, missing fingers, blurry, low quality'
+            }
+        },
+        currentPromptProfile: '默认',
+        promptReplaceProfiles: { '默认': { rules: '' } },
+        currentPromptReplaceProfile: '默认',
         width: 1024,
         height: 1024,
         steps: 28,
@@ -96,6 +114,10 @@ function settings() {
     if (!s.comfyuiProfiles || typeof s.comfyuiProfiles !== 'object') s.comfyuiProfiles = { '默认': { workflow: DEFAULT_WORKFLOW } };
     if (!s.currentProfile || !s.comfyuiProfiles[s.currentProfile]) s.currentProfile = Object.keys(s.comfyuiProfiles)[0] || '默认';
     if (!s.comfyuiProfiles[s.currentProfile]) s.comfyuiProfiles[s.currentProfile] = { workflow: DEFAULT_WORKFLOW };
+    if (!s.promptProfiles || typeof s.promptProfiles !== 'object') s.promptProfiles = defaultSettings().promptProfiles;
+    if (!s.currentPromptProfile || !s.promptProfiles[s.currentPromptProfile]) s.currentPromptProfile = Object.keys(s.promptProfiles)[0] || '默认';
+    if (!s.promptReplaceProfiles || typeof s.promptReplaceProfiles !== 'object') s.promptReplaceProfiles = { '默认': { rules: '' } };
+    if (!s.currentPromptReplaceProfile || !s.promptReplaceProfiles[s.currentPromptReplaceProfile]) s.currentPromptReplaceProfile = Object.keys(s.promptReplaceProfiles)[0] || '默认';
     if (!s.customPlaceholders || typeof s.customPlaceholders !== 'object') s.customPlaceholders = {};
     return s;
 }
@@ -184,12 +206,79 @@ async function refreshComfyObjects() {
     return info;
 }
 
+function applyPromptReplaceRules(prompt) {
+    const s = settings();
+    const profile = s.promptReplaceProfiles[s.currentPromptReplaceProfile] || { rules: '' };
+    const lines = String(profile.rules || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    let result = String(prompt || '');
+    for (const line of lines) {
+        if (line.startsWith('#')) continue;
+        const parsed = parseReplaceRule(line);
+        if (!parsed) continue;
+        if (parsed.ifText && !result.includes(parsed.ifText)) continue;
+        if (parsed.regex) {
+            try {
+                result = result.replace(new RegExp(parsed.find, parsed.flags || 'g'), parsed.replace);
+            } catch (error) {
+                console.warn(`[${EXT_NAME}] 替换规则正则错误`, line, error);
+            }
+        } else {
+            result = result.split(parsed.find).join(parsed.replace);
+        }
+    }
+    return result;
+}
+
+function parseReplaceRule(line) {
+    let ifText = '';
+    let body = line;
+    const ifMatch = body.match(/^if\s+(.+?)\s*=>\s*(.+)$/i);
+    if (ifMatch) {
+        ifText = ifMatch[1].trim();
+        body = ifMatch[2].trim();
+    }
+    if (body.startsWith('regex:')) {
+        const m = body.match(/^regex:\s*\/(.*)\/([gimsuy]*)\s*=>\s*(.*)$/);
+        if (!m) return null;
+        return { regex: true, find: m[1], flags: m[2] || 'g', replace: m[3], ifText };
+    }
+    const parts = body.split('=>');
+    if (parts.length < 2) return null;
+    return { regex: false, find: parts[0].trim(), replace: parts.slice(1).join('=>').trim(), ifText };
+}
+
+function joinPromptParts(parts) {
+    return parts.map(x => String(x || '').trim()).filter(Boolean).join(', ');
+}
+
+function buildFinalPrompt(rawPrompt) {
+    const s = settings();
+    const replaced = applyPromptReplaceRules(rawPrompt);
+    return joinPromptParts([
+        s.enableQualityPositive ? s.qualityPositive : '',
+        s.fixedPromptPrefix,
+        replaced,
+        s.fixedPromptSuffix,
+    ]);
+}
+
+function buildFinalNegativePrompt() {
+    const s = settings();
+    return joinPromptParts([
+        s.enableQualityNegative ? s.qualityNegative : '',
+        s.negativePrompt,
+    ]);
+}
+
 function buildContext(rawPrompt, overrides = {}) {
     const s = settings();
     const seed = Number(overrides.seed ?? s.seed);
+    const finalPrompt = buildFinalPrompt(rawPrompt);
+    const finalNegative = overrides.negativePrompt ?? buildFinalNegativePrompt();
     return {
-        prompt: rawPrompt,
-        negative_prompt: overrides.negativePrompt ?? s.negativePrompt ?? '',
+        raw_prompt: rawPrompt,
+        prompt: finalPrompt,
+        negative_prompt: finalNegative,
         width: Number(overrides.width ?? s.width) || 1024,
         height: Number(overrides.height ?? s.height) || 1024,
         steps: Number(overrides.steps ?? s.steps) || 28,
@@ -458,7 +547,7 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.2.0</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.3.0</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -475,13 +564,26 @@ function openPanel() {
     <section><h3>生成参数</h3>
       <div class="cc-grid three"><label>宽<input id="cc-width" type="number" class="cc-input" value="${escapeHtml(s.width)}"></label><label>高<input id="cc-height" type="number" class="cc-input" value="${escapeHtml(s.height)}"></label><label>步数<input id="cc-steps" type="number" class="cc-input" value="${escapeHtml(s.steps)}"></label></div>
       <div class="cc-grid three"><label>CFG<input id="cc-cfgScale" type="number" step="0.1" class="cc-input" value="${escapeHtml(s.cfgScale)}"></label><label>种子<input id="cc-seed" type="number" class="cc-input" value="${escapeHtml(s.seed)}"></label><label>轮询(ms)<input id="cc-pollIntervalMs" type="number" class="cc-input" value="${escapeHtml(s.pollIntervalMs)}"></label></div>
-      <label>负面提示词<textarea id="cc-negativePrompt" class="cc-textarea" rows="3">${escapeHtml(s.negativePrompt)}</textarea></label>
-      <label class="cc-check"><input id="cc-autoPatchWorkflow" type="checkbox" ${s.autoPatchWorkflow ? 'checked' : ''}> 自动补丁工作流常见节点参数</label>
+    </section>
+    <section><h3>提示词增强</h3>
+      <div class="cc-row"><select id="cc-promptProfile" class="cc-select">${Object.keys(s.promptProfiles).map(name => `<option value="${escapeHtml(name)}" ${name === s.currentPromptProfile ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select><button id="cc-savePromptProfile" class="cc-btn">保存提示词档</button><button id="cc-newPromptProfile" class="cc-btn">新建</button><button id="cc-deletePromptProfile" class="cc-btn danger">删除</button></div>
+      <label>固定前置正面<textarea id="cc-fixedPromptPrefix" class="cc-textarea" rows="2">${escapeHtml(s.fixedPromptPrefix)}</textarea></label>
+      <label>固定后置正面<textarea id="cc-fixedPromptSuffix" class="cc-textarea" rows="2">${escapeHtml(s.fixedPromptSuffix)}</textarea></label>
+      <label>固定负面提示词<textarea id="cc-negativePrompt" class="cc-textarea" rows="3">${escapeHtml(s.negativePrompt)}</textarea></label>
+      <label class="cc-check"><input id="cc-enableQualityPositive" type="checkbox" ${s.enableQualityPositive ? 'checked' : ''}> 启用正面质量预设</label>
+      <textarea id="cc-qualityPositive" class="cc-textarea" rows="2">${escapeHtml(s.qualityPositive)}</textarea>
+      <label class="cc-check"><input id="cc-enableQualityNegative" type="checkbox" ${s.enableQualityNegative ? 'checked' : ''}> 启用负面质量预设</label>
+      <textarea id="cc-qualityNegative" class="cc-textarea" rows="2">${escapeHtml(s.qualityNegative)}</textarea>
+      <div class="cc-row"><select id="cc-replaceProfile" class="cc-select">${Object.keys(s.promptReplaceProfiles).map(name => `<option value="${escapeHtml(name)}" ${name === s.currentPromptReplaceProfile ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select><button id="cc-saveReplaceProfile" class="cc-btn">保存替换</button><button id="cc-newReplaceProfile" class="cc-btn">新建</button><button id="cc-deleteReplaceProfile" class="cc-btn danger">删除</button></div>
+      <label>替换规则<textarea id="cc-replaceRules" class="cc-textarea mono" rows="6">${escapeHtml(s.promptReplaceProfiles[s.currentPromptReplaceProfile]?.rules || '')}</textarea></label>
+      <p class="cc-help">替换规则：每行一个，支持 <code>猫=>cat</code>、<code>regex:/女孩|少女/g=>girl</code>、<code>if 夜晚=>天空=>night sky</code>。# 开头为注释。</p>
+      <p class="cc-help">最终正面 = 正面质量 + 固定前置 + 聊天提示词(替换后) + 固定后置；最终负面 = 负面质量 + 固定负面。</p>
     </section>
     <section><h3>工作流预设</h3>
       <div class="cc-row"><select id="cc-profile" class="cc-select">${Object.keys(s.comfyuiProfiles).map(name => `<option value="${escapeHtml(name)}" ${name === s.currentProfile ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select><button id="cc-saveProfile" class="cc-btn">保存预设</button><button id="cc-newProfile" class="cc-btn">新建</button><button id="cc-deleteProfile" class="cc-btn danger">删除</button></div>
       <textarea id="cc-workflow" class="cc-textarea mono" rows="14">${escapeHtml(s.comfyuiProfiles[s.currentProfile]?.workflow || DEFAULT_WORKFLOW)}</textarea>
-      <p class="cc-help">占位符支持 %prompt% / {{prompt}}、%negative_prompt%、%width%、%height%、%steps%、%cfg_scale%、%seed%、%sampler_name%、%scheduler%、%model_name%、%vae_name%、%clip_name%。</p>
+      <label class="cc-check"><input id="cc-autoPatchWorkflow" type="checkbox" ${s.autoPatchWorkflow ? 'checked' : ''}> 自动补丁工作流常见节点参数</label>
+      <p class="cc-help">占位符支持 %prompt% / {{prompt}}、%negative_prompt%、%raw_prompt%、%width%、%height%、%steps%、%cfg_scale%、%seed%、%sampler_name%、%scheduler%、%model_name%、%vae_name%、%clip_name%。</p>
     </section>
     <section><h3>任务队列</h3>
       <div class="cc-row"><span id="cc-queue-status">运行 0 / 等待 0</span><button id="cc-cancelAll" class="cc-btn danger">取消全部</button></div>
@@ -515,7 +617,23 @@ function readPanel() {
     s.cfgScale = Number($('#cc-cfgScale').val()) || 6;
     s.seed = Number($('#cc-seed').val());
     s.pollIntervalMs = Number($('#cc-pollIntervalMs').val()) || 1000;
+    s.fixedPromptPrefix = $('#cc-fixedPromptPrefix').val();
+    s.fixedPromptSuffix = $('#cc-fixedPromptSuffix').val();
     s.negativePrompt = $('#cc-negativePrompt').val();
+    s.qualityPositive = $('#cc-qualityPositive').val();
+    s.qualityNegative = $('#cc-qualityNegative').val();
+    s.enableQualityPositive = $('#cc-enableQualityPositive').prop('checked');
+    s.enableQualityNegative = $('#cc-enableQualityNegative').prop('checked');
+    s.currentPromptProfile = $('#cc-promptProfile').val();
+    s.promptProfiles[s.currentPromptProfile] = {
+        fixedPromptPrefix: s.fixedPromptPrefix,
+        fixedPromptSuffix: s.fixedPromptSuffix,
+        negativePrompt: s.negativePrompt,
+        qualityPositive: s.qualityPositive,
+        qualityNegative: s.qualityNegative,
+    };
+    s.currentPromptReplaceProfile = $('#cc-replaceProfile').val();
+    s.promptReplaceProfiles[s.currentPromptReplaceProfile] = { rules: $('#cc-replaceRules').val() };
     s.autoPatchWorkflow = $('#cc-autoPatchWorkflow').prop('checked');
     s.debugMode = $('#cc-debugMode').prop('checked');
     s.currentProfile = $('#cc-profile').val();
@@ -527,6 +645,70 @@ function bindPanel($panel) {
     $panel.off('.cc')
         .on('click.cc', '.cc-close', () => $panel.remove())
         .on('click.cc', '#cc-save', () => { readPanel(); toastr?.success('已保存'); })
+        .on('change.cc', '#cc-promptProfile', () => {
+            const s = settings();
+            s.currentPromptProfile = $('#cc-promptProfile').val();
+            const p = s.promptProfiles[s.currentPromptProfile] || {};
+            $('#cc-fixedPromptPrefix').val(p.fixedPromptPrefix || '');
+            $('#cc-fixedPromptSuffix').val(p.fixedPromptSuffix || '');
+            $('#cc-negativePrompt').val(p.negativePrompt || '');
+            $('#cc-qualityPositive').val(p.qualityPositive || s.qualityPositive || '');
+            $('#cc-qualityNegative').val(p.qualityNegative || s.qualityNegative || '');
+        })
+        .on('click.cc', '#cc-savePromptProfile', () => { readPanel(); toastr?.success('提示词档已保存'); })
+        .on('click.cc', '#cc-newPromptProfile', () => {
+            const name = prompt('新提示词档名称');
+            if (!name) return;
+            const s = settings();
+            if (s.promptProfiles[name]) return toastr?.warning('提示词档已存在');
+            readPanel();
+            s.promptProfiles[name] = {
+                fixedPromptPrefix: s.fixedPromptPrefix,
+                fixedPromptSuffix: s.fixedPromptSuffix,
+                negativePrompt: s.negativePrompt,
+                qualityPositive: s.qualityPositive,
+                qualityNegative: s.qualityNegative,
+            };
+            s.currentPromptProfile = name;
+            save();
+            $panel.remove(); openPanel();
+        })
+        .on('click.cc', '#cc-deletePromptProfile', () => {
+            const s = settings();
+            if (Object.keys(s.promptProfiles).length <= 1) return toastr?.warning('至少保留一个提示词档');
+            const name = $('#cc-promptProfile').val();
+            if (!confirm(`删除提示词档「${name}」？`)) return;
+            delete s.promptProfiles[name];
+            s.currentPromptProfile = Object.keys(s.promptProfiles)[0];
+            save();
+            $panel.remove(); openPanel();
+        })
+        .on('change.cc', '#cc-replaceProfile', () => {
+            const s = settings();
+            s.currentPromptReplaceProfile = $('#cc-replaceProfile').val();
+            $('#cc-replaceRules').val(s.promptReplaceProfiles[s.currentPromptReplaceProfile]?.rules || '');
+        })
+        .on('click.cc', '#cc-saveReplaceProfile', () => { readPanel(); toastr?.success('替换规则已保存'); })
+        .on('click.cc', '#cc-newReplaceProfile', () => {
+            const name = prompt('新替换规则名称');
+            if (!name) return;
+            const s = settings();
+            if (s.promptReplaceProfiles[name]) return toastr?.warning('替换规则已存在');
+            s.promptReplaceProfiles[name] = { rules: $('#cc-replaceRules').val() || '' };
+            s.currentPromptReplaceProfile = name;
+            save();
+            $panel.remove(); openPanel();
+        })
+        .on('click.cc', '#cc-deleteReplaceProfile', () => {
+            const s = settings();
+            if (Object.keys(s.promptReplaceProfiles).length <= 1) return toastr?.warning('至少保留一个替换规则');
+            const name = $('#cc-replaceProfile').val();
+            if (!confirm(`删除替换规则「${name}」？`)) return;
+            delete s.promptReplaceProfiles[name];
+            s.currentPromptReplaceProfile = Object.keys(s.promptReplaceProfiles)[0];
+            save();
+            $panel.remove(); openPanel();
+        })
         .on('click.cc', '#cc-test', async () => {
             try { readPanel(); await testComfyConnection(); toastr?.success('ComfyUI 连接成功'); }
             catch (error) { toastr?.error(error.message); }
