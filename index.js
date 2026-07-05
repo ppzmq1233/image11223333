@@ -7,6 +7,52 @@ const EXT_NAME = 'st-chatu8-comfy';
 const PANEL_ID = 'st-chatu8-comfy-settings-panel';
 const ENTRY_ID = 'st-chatu8-comfy-entry';
 
+const DEFAULT_EDIT_WORKFLOW = JSON.stringify({
+    "1": {
+        "class_type": "CheckpointLoaderSimple",
+        "inputs": { "ckpt_name": "%model_name%" }
+    },
+    "2": {
+        "class_type": "LoadImage",
+        "inputs": { "image": "%edit_image%" }
+    },
+    "3": {
+        "class_type": "VAEEncode",
+        "inputs": { "pixels": ["2", 0], "vae": ["1", 2] }
+    },
+    "4": {
+        "class_type": "CLIPTextEncode",
+        "inputs": { "text": "%prompt%", "clip": ["1", 1] }
+    },
+    "5": {
+        "class_type": "CLIPTextEncode",
+        "inputs": { "text": "%negative_prompt%", "clip": ["1", 1] }
+    },
+    "6": {
+        "class_type": "KSampler",
+        "inputs": {
+            "seed": "%seed%",
+            "steps": "%steps%",
+            "cfg": "%cfg_scale%",
+            "sampler_name": "%sampler_name%",
+            "scheduler": "%scheduler%",
+            "denoise": "%denoise%",
+            "model": ["1", 0],
+            "positive": ["4", 0],
+            "negative": ["5", 0],
+            "latent_image": ["3", 0]
+        }
+    },
+    "7": {
+        "class_type": "VAEDecode",
+        "inputs": { "samples": ["6", 0], "vae": ["1", 2] }
+    },
+    "8": {
+        "class_type": "SaveImage",
+        "inputs": { "images": ["7", 0], "filename_prefix": "st-comfy-edit" }
+    }
+}, null, 2);
+
 const DEFAULT_WORKFLOW = JSON.stringify({
     "3": {
         "class_type": "KSampler",
@@ -103,6 +149,11 @@ function defaultSettings() {
         customPlaceholders: {},
         comfyuiProfiles: { '默认': { workflow: DEFAULT_WORKFLOW } },
         currentProfile: '默认',
+        editProfiles: { '默认修图': { workflow: DEFAULT_EDIT_WORKFLOW } },
+        currentEditProfile: '默认修图',
+        editImageSlot: 'ref',
+        editMaskSlot: 'mask',
+        denoise: 0.75,
     };
 }
 
@@ -116,6 +167,9 @@ function settings() {
     if (!s.comfyuiProfiles || typeof s.comfyuiProfiles !== 'object') s.comfyuiProfiles = { '默认': { workflow: DEFAULT_WORKFLOW } };
     if (!s.currentProfile || !s.comfyuiProfiles[s.currentProfile]) s.currentProfile = Object.keys(s.comfyuiProfiles)[0] || '默认';
     if (!s.comfyuiProfiles[s.currentProfile]) s.comfyuiProfiles[s.currentProfile] = { workflow: DEFAULT_WORKFLOW };
+    if (!s.editProfiles || typeof s.editProfiles !== 'object') s.editProfiles = { '默认修图': { workflow: DEFAULT_EDIT_WORKFLOW } };
+    if (!s.currentEditProfile || !s.editProfiles[s.currentEditProfile]) s.currentEditProfile = Object.keys(s.editProfiles)[0] || '默认修图';
+    if (!s.editProfiles[s.currentEditProfile]) s.editProfiles[s.currentEditProfile] = { workflow: DEFAULT_EDIT_WORKFLOW };
     if (!s.promptProfiles || typeof s.promptProfiles !== 'object') s.promptProfiles = defaultSettings().promptProfiles;
     if (!s.currentPromptProfile || !s.promptProfiles[s.currentPromptProfile]) s.currentPromptProfile = Object.keys(s.promptProfiles)[0] || '默认';
     if (!s.promptReplaceProfiles || typeof s.promptReplaceProfiles !== 'object') s.promptReplaceProfiles = { '默认': { rules: '' } };
@@ -301,11 +355,18 @@ function buildExtraContext() {
     return ctx;
 }
 
+function findImageBySlot(slot) {
+    const images = Array.isArray(settings().uploadedImages) ? settings().uploadedImages : [];
+    return images.find(img => img.slot === slot) || images.find(img => img.name === slot) || null;
+}
+
 function buildContext(rawPrompt, overrides = {}) {
     const s = settings();
     const seed = Number(overrides.seed ?? s.seed);
     const finalPrompt = buildFinalPrompt(rawPrompt);
     const finalNegative = overrides.negativePrompt ?? buildFinalNegativePrompt();
+    const editImage = overrides.editImage || findImageBySlot(overrides.editImageSlot || s.editImageSlot);
+    const editMask = overrides.editMask || findImageBySlot(overrides.editMaskSlot || s.editMaskSlot);
     return {
         raw_prompt: rawPrompt,
         prompt: finalPrompt,
@@ -320,6 +381,17 @@ function buildContext(rawPrompt, overrides = {}) {
         model_name: overrides.modelName ?? s.modelName ?? '',
         vae_name: overrides.vaeName ?? s.vaeName ?? '',
         clip_name: overrides.clipName ?? s.clipName ?? '',
+        denoise: Number(overrides.denoise ?? s.denoise ?? 0.75),
+        edit_image: editImage?.name || '',
+        edit_image_filename: editImage?.name || '',
+        edit_image_subfolder: editImage?.subfolder || '',
+        edit_image_type: editImage?.type || 'input',
+        edit_mask: editMask?.name || '',
+        edit_mask_filename: editMask?.name || '',
+        edit_mask_subfolder: editMask?.subfolder || '',
+        edit_mask_type: editMask?.type || 'input',
+        inpaint_positive: finalPrompt,
+        inpaint_negative: finalNegative,
         profile: s.currentProfile,
         ...buildExtraContext(),
         ...s.customPlaceholders,
@@ -376,7 +448,9 @@ function autoPatchWorkflow(workflow, ctx) {
 
 function prepareWorkflow(rawPrompt, overrides = {}) {
     const s = settings();
-    const profile = s.comfyuiProfiles[s.currentProfile] || { workflow: DEFAULT_WORKFLOW };
+    const profile = overrides.mode === 'edit'
+        ? (s.editProfiles[s.currentEditProfile] || { workflow: DEFAULT_EDIT_WORKFLOW })
+        : (s.comfyuiProfiles[s.currentProfile] || { workflow: DEFAULT_WORKFLOW });
     const ctx = buildContext(rawPrompt, overrides);
     const replaced = replacePlaceholders(profile.workflow, ctx);
     let workflow;
@@ -610,7 +684,7 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.4.0</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.5.0</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -657,6 +731,13 @@ function openPanel() {
       <textarea id="cc-workflow" class="cc-textarea mono" rows="14">${escapeHtml(s.comfyuiProfiles[s.currentProfile]?.workflow || DEFAULT_WORKFLOW)}</textarea>
       <label class="cc-check"><input id="cc-autoPatchWorkflow" type="checkbox" ${s.autoPatchWorkflow ? 'checked' : ''}> 自动补丁工作流常见节点参数</label>
       <p class="cc-help">占位符支持 %prompt% / {{prompt}}、%negative_prompt%、%raw_prompt%、%width%、%height%、%steps%、%cfg_scale%、%seed%、%sampler_name%、%scheduler%、%model_name%、%vae_name%、%clip_name%。</p>
+    </section>
+    <section><h3>修图 / inpaint 工作流</h3>
+      <div class="cc-row"><select id="cc-editProfile" class="cc-select">${Object.keys(s.editProfiles).map(name => `<option value="${escapeHtml(name)}" ${name === s.currentEditProfile ? 'selected' : ''}>${escapeHtml(name)}</option>`).join('')}</select><button id="cc-saveEditProfile" class="cc-btn">保存修图预设</button><button id="cc-newEditProfile" class="cc-btn">新建</button><button id="cc-deleteEditProfile" class="cc-btn danger">删除</button></div>
+      <div class="cc-grid three"><label>原图槽位<input id="cc-editImageSlot" class="cc-input" value="${escapeHtml(s.editImageSlot)}"></label><label>遮罩槽位<input id="cc-editMaskSlot" class="cc-input" value="${escapeHtml(s.editMaskSlot)}"></label><label>去噪<input id="cc-denoise" class="cc-input" type="number" step="0.05" value="${escapeHtml(s.denoise)}"></label></div>
+      <textarea id="cc-editWorkflow" class="cc-textarea mono" rows="12">${escapeHtml(s.editProfiles[s.currentEditProfile]?.workflow || DEFAULT_EDIT_WORKFLOW)}</textarea>
+      <div class="cc-row"><input id="cc-editPrompt" class="cc-input" placeholder="修图提示词"><button id="cc-runEdit" class="cc-btn">用当前槽位修图</button></div>
+      <p class="cc-help">修图占位符：%edit_image%、%edit_mask%、%denoise%、%inpaint_positive%、%inpaint_negative%。先在“上传图片槽位”上传原图/遮罩，再运行修图。</p>
     </section>
     <section><h3>任务队列</h3>
       <div class="cc-row"><span id="cc-queue-status">运行 0 / 等待 0</span><button id="cc-cancelAll" class="cc-btn danger">取消全部</button></div>
@@ -711,6 +792,11 @@ function readPanel() {
     s.debugMode = $('#cc-debugMode').prop('checked');
     s.currentProfile = $('#cc-profile').val();
     s.comfyuiProfiles[s.currentProfile] = { workflow: $('#cc-workflow').val() };
+    s.currentEditProfile = $('#cc-editProfile').val();
+    s.editProfiles[s.currentEditProfile] = { workflow: $('#cc-editWorkflow').val() };
+    s.editImageSlot = $('#cc-editImageSlot').val();
+    s.editMaskSlot = $('#cc-editMaskSlot').val();
+    s.denoise = Number($('#cc-denoise').val()) || 0.75;
     save();
 }
 
@@ -857,6 +943,39 @@ function bindPanel($panel) {
             save();
             $panel.remove(); openPanel();
         })
+        .on('change.cc', '#cc-editProfile', () => {
+            const s = settings();
+            s.currentEditProfile = $('#cc-editProfile').val();
+            $('#cc-editWorkflow').val(s.editProfiles[s.currentEditProfile]?.workflow || DEFAULT_EDIT_WORKFLOW);
+        })
+        .on('click.cc', '#cc-saveEditProfile', () => { readPanel(); toastr?.success('修图预设已保存'); })
+        .on('click.cc', '#cc-newEditProfile', () => {
+            const name = prompt('新修图预设名称');
+            if (!name) return;
+            const s = settings();
+            if (s.editProfiles[name]) return toastr?.warning('修图预设已存在');
+            s.editProfiles[name] = { workflow: DEFAULT_EDIT_WORKFLOW };
+            s.currentEditProfile = name;
+            save();
+            $panel.remove(); openPanel();
+        })
+        .on('click.cc', '#cc-deleteEditProfile', () => {
+            const s = settings();
+            if (Object.keys(s.editProfiles).length <= 1) return toastr?.warning('至少保留一个修图预设');
+            const name = $('#cc-editProfile').val();
+            if (!confirm(`删除修图预设「${name}」？`)) return;
+            delete s.editProfiles[name];
+            s.currentEditProfile = Object.keys(s.editProfiles)[0];
+            save();
+            $panel.remove(); openPanel();
+        })
+        .on('click.cc', '#cc-runEdit', () => {
+            readPanel();
+            const prompt = $('#cc-editPrompt').val() || 'inpaint, best quality';
+            const messageId = getLastMessageIdSafe();
+            queue.push({ messageId, prompt, overrides: { mode: 'edit' } });
+            toastr?.info('修图任务已加入队列');
+        })
         .on('click.cc', '#cc-cancelAll', () => { queue.cancelAll(); toastr?.warning('已请求取消全部任务'); });
 }
 
@@ -867,6 +986,16 @@ function addEntryButton() {
     const $entry = $(`<div id="${ENTRY_ID}" class="inline-drawer"><button class="menu_button" type="button"><i class="fa-solid fa-image"></i> ComfyUI 生图桥</button></div>`);
     $root.append($entry);
     $entry.on('click', 'button', openPanel);
+}
+
+function getLastMessageIdSafe() {
+    try {
+        const context = getContext();
+        if (Array.isArray(context.chat) && context.chat.length) return context.chat.length - 1;
+    } catch (_) {}
+    const $last = $('#chat .mes').last();
+    const id = Number($last.attr('mes_id'));
+    return Number.isFinite(id) ? id : 0;
 }
 
 function bindChatInteractions() {
