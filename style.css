@@ -134,6 +134,45 @@
     cursor: pointer;
 }
 #st-chatu8-comfy-settings-panel .cc-empty { opacity: 0.55; font-size: 12px; }
+.st-chatu8-comfy-chat-button {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 32px;
+    margin: 0 4px;
+}
+.st-chatu8-comfy-chat-button.floating {
+    position: fixed;
+    right: 18px;
+    bottom: 88px;
+    z-index: 99999;
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.st-chatu8-comfy-quick-menu {
+    position: fixed;
+    z-index: 100001;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    background: var(--SmartThemeBlurTintColor, #1f2233);
+    color: var(--SmartThemeBodyColor, #e0e0e0);
+    border: 1px solid var(--SmartThemeBorderColor, #444);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+.st-chatu8-comfy-quick-menu button {
+    text-align: left;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+.st-chatu8-comfy-quick-menu button:hover { background: rgba(255,255,255,0.1); }
 .st-chatu8-comfy-result {
     display: inline-block;
     max-width: 100%;

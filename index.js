@@ -6,6 +6,8 @@ const EXT_KEY = 'st-chatu8-comfy';
 const EXT_NAME = 'st-chatu8-comfy';
 const PANEL_ID = 'st-chatu8-comfy-settings-panel';
 const ENTRY_ID = 'st-chatu8-comfy-entry';
+const CHAT_BUTTON_ID = 'st-chatu8-comfy-chat-button';
+const QUICK_MENU_ID = 'st-chatu8-comfy-quick-menu';
 
 const DEFAULT_EDIT_WORKFLOW = JSON.stringify({
     "1": {
@@ -728,7 +730,7 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.0</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.1</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -1038,6 +1040,69 @@ function addEntryButton() {
     $entry.on('click', 'button', openPanel);
 }
 
+function getPromptTextareaValue() {
+    const selectors = ['#send_textarea', '#send_textarea textarea', 'textarea[name="send_textarea"]', '#send_form textarea', '#send_form [contenteditable="true"]'];
+    for (const selector of selectors) {
+        const $el = $(selector).first();
+        if (!$el.length) continue;
+        if ($el.is('[contenteditable="true"]')) return ($el.text() || '').trim();
+        return ($el.val() || '').trim();
+    }
+    return '';
+}
+
+function addChatQuickButton() {
+    if ($(`#${CHAT_BUTTON_ID}`).length) return;
+    const $button = $(`<button id="${CHAT_BUTTON_ID}" class="menu_button st-chatu8-comfy-chat-button" type="button" title="ComfyUI 生图桥：左键打开，Shift+左键用输入框生图，右键快速菜单"><i class="fa-solid fa-image"></i></button>`);
+    const anchors = ['#send_form .mes_button_bar', '#send_form .send_buttons', '#send_form', '#chat_footer', '#form_sheld'];
+    let inserted = false;
+    for (const selector of anchors) {
+        const $anchor = $(selector).first();
+        if ($anchor.length) {
+            $anchor.append($button);
+            inserted = true;
+            break;
+        }
+    }
+    if (!inserted) $('body').append($button.addClass('floating'));
+    $button.on('click', event => {
+        if (event.shiftKey) return quickGenerateFromInput('normal');
+        openPanel();
+    });
+    $button.on('contextmenu', event => {
+        event.preventDefault();
+        openQuickMenu(event.clientX, event.clientY);
+    });
+}
+
+function openQuickMenu(x, y) {
+    $(`#${QUICK_MENU_ID}`).remove();
+    const $menu = $(`<div id="${QUICK_MENU_ID}" class="st-chatu8-comfy-quick-menu">
+        <button data-quick="panel">打开面板</button>
+        <button data-quick="generate">输入框内容生图</button>
+        <button data-quick="edit">输入框内容修图</button>
+        <button data-quick="cancel">取消全部任务</button>
+    </div>`);
+    $('body').append($menu);
+    $menu.css({ left: `${x}px`, top: `${y}px` });
+    $menu.on('click', '[data-quick]', function () {
+        const action = $(this).attr('data-quick');
+        if (action === 'panel') openPanel();
+        if (action === 'generate') quickGenerateFromInput('normal');
+        if (action === 'edit') quickGenerateFromInput('edit');
+        if (action === 'cancel') queue.cancelAll();
+        $menu.remove();
+    });
+    setTimeout(() => $(document).one('click', () => $menu.remove()), 0);
+}
+
+function quickGenerateFromInput(mode = 'normal') {
+    const prompt = getPromptTextareaValue();
+    if (!prompt) return toastr?.warning('输入框为空');
+    queue.push({ messageId: getLastMessageIdSafe(), prompt, overrides: mode === 'edit' ? { mode: 'edit' } : {} });
+    toastr?.info(mode === 'edit' ? '已加入修图任务' : '已加入生图任务');
+}
+
 function getLastMessageIdSafe() {
     try {
         const context = getContext();
@@ -1128,5 +1193,8 @@ jQuery(() => {
     bindEvents();
     bindChatInteractions();
     addEntryButton();
+    addChatQuickButton();
+    setTimeout(addChatQuickButton, 1500);
+    setTimeout(addChatQuickButton, 5000);
     log('loaded');
 });
