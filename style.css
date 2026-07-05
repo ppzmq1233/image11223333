@@ -134,12 +134,32 @@
     cursor: pointer;
 }
 #st-chatu8-comfy-settings-panel .cc-empty { opacity: 0.55; font-size: 12px; }
+.st-chatu8-comfy-result {
+    display: inline-block;
+    max-width: 100%;
+    margin: 8px 0;
+}
 .st-chatu8-comfy-image {
     display: block;
     max-width: 100%;
     border-radius: 6px;
-    margin: 8px 0;
+    margin: 8px 0 4px;
     cursor: zoom-in;
+}
+.st-chatu8-comfy-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 8px;
+}
+.st-chatu8-comfy-actions button {
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(0,0,0,0.18);
+    color: inherit;
+    cursor: pointer;
 }
 @media (max-width: 720px) {
     #st-chatu8-comfy-settings-panel.st-chatu8-comfy-panel {

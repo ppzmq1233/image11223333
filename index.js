@@ -137,6 +137,9 @@ function defaultSettings() {
         allowBatch: true,
         batchDelimiter: '\n---\n',
         appendOriginalPrompt: false,
+        showImageActions: true,
+        compressToJpeg: false,
+        jpegQuality: 0.9,
         debugMode: false,
         models: [],
         samplers: [],
@@ -216,6 +219,39 @@ function blobToDataUrl(blob) {
         reader.onerror = reject;
         reader.readAsDataURL(blob);
     });
+}
+
+function dataUrlToJpeg(dataUrl, quality = 0.9) {
+    return new Promise((resolve) => {
+        if (!settings().compressToJpeg || !String(dataUrl).startsWith('data:image/')) return resolve(dataUrl);
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', Math.max(0.1, Math.min(1, Number(quality) || 0.9))));
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+    });
+}
+
+function downloadDataUrl(dataUrl, filename = 'comfyui-image.png') {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); toastr?.success('已复制'); }
+    catch (_) { prompt('复制文本', text); }
 }
 
 async function fetchJson(url, options = {}) {
@@ -597,8 +633,16 @@ const queue = {
 };
 
 async function insertResult(messageId, dataUrl, prompt) {
+    const finalDataUrl = await dataUrlToJpeg(dataUrl, settings().jpegQuality);
     const escaped = String(prompt || '').replace(/"/g, '&quot;');
-    const html = `\n\n<img class="st-chatu8-comfy-image" src="${dataUrl}" alt="${escaped}" data-comfy-prompt="${escaped}" />\n\n`;
+    const actions = settings().showImageActions ? `<div class="st-chatu8-comfy-actions">
+        <button data-cc-action="preview">预览</button>
+        <button data-cc-action="redo">重做</button>
+        <button data-cc-action="edit">修图</button>
+        <button data-cc-action="copy">复制提示词</button>
+        <button data-cc-action="download">下载</button>
+    </div>` : '';
+    const html = `\n\n<div class="st-chatu8-comfy-result" data-comfy-prompt="${escaped}"><img class="st-chatu8-comfy-image" src="${finalDataUrl}" alt="${escaped}" data-comfy-prompt="${escaped}" />${actions}</div>\n\n`;
     let saved = false;
     try {
         const context = getContext();
@@ -684,13 +728,16 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.5.0</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.0</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
       <div class="cc-grid two"><label>开始标记<input id="cc-startTag" class="cc-input" value="${escapeHtml(s.startTag)}"></label><label>结束标记<input id="cc-endTag" class="cc-input" value="${escapeHtml(s.endTag)}"></label></div>
       <div class="cc-grid two"><label>批量分隔符<input id="cc-batchDelimiter" class="cc-input" value="${escapeHtml(String(s.batchDelimiter).replace(/\n/g, '\\n'))}"></label><label>并发数<input id="cc-maxConcurrent" type="number" min="1" max="8" class="cc-input" value="${escapeHtml(s.maxConcurrent)}"></label></div>
       <label class="cc-check"><input id="cc-allowBatch" type="checkbox" ${s.allowBatch ? 'checked' : ''}> 一个标记内允许批量提示词</label>
+      <label class="cc-check"><input id="cc-showImageActions" type="checkbox" ${s.showImageActions ? 'checked' : ''}> 在生成图下方显示操作按钮</label>
+      <label class="cc-check"><input id="cc-compressToJpeg" type="checkbox" ${s.compressToJpeg ? 'checked' : ''}> 图片插入楼层前压缩为 JPEG</label>
+      <label>JPEG 质量<input id="cc-jpegQuality" class="cc-input" type="number" step="0.05" min="0.1" max="1" value="${escapeHtml(s.jpegQuality)}"></label>
     </section>
     <section><h3>连接与模型</h3>
       <div class="cc-row"><input id="cc-comfyuiUrl" class="cc-input" value="${escapeHtml(s.comfyuiUrl)}"><button id="cc-test" class="cc-btn">测试连接</button><button id="cc-refresh" class="cc-btn">刷新列表</button></div>
@@ -758,6 +805,9 @@ function readPanel() {
     s.endTag = $('#cc-endTag').val();
     s.batchDelimiter = $('#cc-batchDelimiter').val();
     s.allowBatch = $('#cc-allowBatch').prop('checked');
+    s.showImageActions = $('#cc-showImageActions').prop('checked');
+    s.compressToJpeg = $('#cc-compressToJpeg').prop('checked');
+    s.jpegQuality = Number($('#cc-jpegQuality').val()) || 0.9;
     s.maxConcurrent = Number($('#cc-maxConcurrent').val()) || 1;
     s.comfyuiUrl = $('#cc-comfyuiUrl').val();
     s.modelName = $('#cc-modelName').val();
@@ -998,19 +1048,69 @@ function getLastMessageIdSafe() {
     return Number.isFinite(id) ? id : 0;
 }
 
+function getPromptFromResult($el) {
+    return $el.closest('.st-chatu8-comfy-result').attr('data-comfy-prompt') || $el.attr('data-comfy-prompt') || '';
+}
+
+function getMessageIdFromElement($el) {
+    const id = Number($el.closest('.mes').attr('mes_id'));
+    return Number.isFinite(id) ? id : getLastMessageIdSafe();
+}
+
+function openPreview(dataUrl) {
+    const win = window.open('', '_blank');
+    if (win) win.document.write(`<img src="${dataUrl}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
+}
+
+async function rerunFromElement($el, mode = 'normal') {
+    const prompt = getPromptFromResult($el);
+    const messageId = getMessageIdFromElement($el);
+    if (!prompt) return toastr?.warning('没有找到原提示词');
+    queue.push({ messageId, prompt, overrides: mode === 'edit' ? { mode: 'edit' } : {} });
+}
+
 function bindChatInteractions() {
+    let longPressTimer = null;
     $(document).off('.stComfyImage')
         .on('click.stComfyImage', '.st-chatu8-comfy-image', function () {
             const src = $(this).attr('src');
-            if (!src) return;
-            const win = window.open('', '_blank');
-            if (win) win.document.write(`<img src="${src}" style="max-width:100%;height:auto;display:block;margin:auto;">`);
+            if (src) openPreview(src);
         })
         .on('dblclick.stComfyImage', '.st-chatu8-comfy-image', function () {
-            const prompt = $(this).attr('data-comfy-prompt');
-            const $mes = $(this).closest('.mes');
-            const messageId = Number($mes.attr('mes_id'));
-            if (prompt && Number.isFinite(messageId)) queue.push({ messageId, prompt, overrides: {} });
+            rerunFromElement($(this), 'normal');
+        })
+        .on('contextmenu.stComfyImage', '.st-chatu8-comfy-image', function (event) {
+            event.preventDefault();
+            const prompt = getPromptFromResult($(this));
+            const next = window.prompt('修改提示词后重做', prompt);
+            if (next === null) return;
+            const messageId = getMessageIdFromElement($(this));
+            queue.push({ messageId, prompt: next, overrides: {} });
+        })
+        .on('touchstart.stComfyImage mousedown.stComfyImage', '.st-chatu8-comfy-image', function () {
+            const $img = $(this);
+            clearTimeout(longPressTimer);
+            longPressTimer = setTimeout(() => {
+                const prompt = getPromptFromResult($img);
+                const next = window.prompt('修改提示词后重做', prompt);
+                if (next !== null) queue.push({ messageId: getMessageIdFromElement($img), prompt: next, overrides: {} });
+            }, 700);
+        })
+        .on('touchend.stComfyImage mouseup.stComfyImage mouseleave.stComfyImage', '.st-chatu8-comfy-image', function () {
+            clearTimeout(longPressTimer);
+        })
+        .on('click.stComfyImage', '[data-cc-action]', function (event) {
+            event.preventDefault();
+            const action = $(this).attr('data-cc-action');
+            const $result = $(this).closest('.st-chatu8-comfy-result');
+            const $img = $result.find('.st-chatu8-comfy-image').first();
+            const src = $img.attr('src');
+            const prompt = getPromptFromResult($result);
+            if (action === 'preview' && src) openPreview(src);
+            if (action === 'redo') rerunFromElement($result, 'normal');
+            if (action === 'edit') rerunFromElement($result, 'edit');
+            if (action === 'copy') copyText(prompt);
+            if (action === 'download' && src) downloadDataUrl(src, 'comfyui-image.jpg');
         });
 }
 

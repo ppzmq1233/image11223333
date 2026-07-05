@@ -6,8 +6,8 @@
     "js": "index.js",
     "css": "style.css",
     "author": "based on st-chatu8 by 从前跟你一样",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "homePage": "https://github.com/ppzmq1233/image11223333",
     "auto_update": true,
-    "updata": "0.5.0\n阶段4：增加修图 / inpaint 工作流通道，支持独立修图预设、原图槽位、遮罩槽位、去噪强度、修图提示词、一键加入修图任务。新增修图占位符 %edit_image%、%edit_mask%、%denoise%、%inpaint_positive%、%inpaint_negative%。修图工作流可复用上传图片槽位。\n\n0.4.0\n阶段3基础：增加 LORA 库单独入口，可从 /object_info 刷新的 LORA 列表中添加复数 LORA，支持 model strength / clip strength / 触发词；增加图片上传槽位入口，上传到 ComfyUI /upload/image 并生成 image_* 占位符。新增 LORA 占位符 %lora_tags%、%lora_names%、%lora_json%、%lora_1_name% 等；新增图片占位符 %image_1%、%image_1_subfolder%、%image_1_type%、%images_json%。自动补丁支持第一个 LoraLoader。\n\n0.3.0\n阶段2复刻优化：提示词增强系统，包括提示词档位、固定前置正面、固定后置正面、固定负面、正面质量预设、负面质量预设、替换规则预设、普通替换、regex替换、if条件替换。新增 %raw_prompt% 占位符，%prompt% 现在为增强后的最终正面提示词。\n\n0.2.0\n阶段1复刻优化：连接测试、/object_info 刷新模型/采样器/调度器/VAE/CLIP/LORA列表、工作流预设、通用占位符 %xxx% 和 {{xxx}}、自动补丁常见节点、任务队列、取消全部、并发控制、多图批量、点击预览、双击重做。\n\n0.1.0\n基于 st-chatu8 拆分出的精简 ComfyUI 连接插件，保留聊天标记触发、工作流预设、生图轮询、图片插入楼层。"
+    "updata": "0.6.0\n阶段5：增加聊天图片操作层和缓存优化。生成图下方可显示操作按钮：预览、重做、修图、复制提示词、下载；支持右键/长按图片修改提示词后重做；可选插入楼层前压缩为 JPEG 并设置质量，降低聊天体积。\n\n0.5.0\n阶段4：增加修图 / inpaint 工作流通道，支持独立修图预设、原图槽位、遮罩槽位、去噪强度、修图提示词、一键加入修图任务。新增修图占位符 %edit_image%、%edit_mask%、%denoise%、%inpaint_positive%、%inpaint_negative%。修图工作流可复用上传图片槽位。\n\n0.4.0\n阶段3基础：增加 LORA 库单独入口，可从 /object_info 刷新的 LORA 列表中添加复数 LORA，支持 model strength / clip strength / 触发词；增加图片上传槽位入口，上传到 ComfyUI /upload/image 并生成 image_* 占位符。新增 LORA 占位符 %lora_tags%、%lora_names%、%lora_json%、%lora_1_name% 等；新增图片占位符 %image_1%、%image_1_subfolder%、%image_1_type%、%images_json%。自动补丁支持第一个 LoraLoader。\n\n0.3.0\n阶段2复刻优化：提示词增强系统，包括提示词档位、固定前置正面、固定后置正面、固定负面、正面质量预设、负面质量预设、替换规则预设、普通替换、regex替换、if条件替换。新增 %raw_prompt% 占位符，%prompt% 现在为增强后的最终正面提示词。\n\n0.2.0\n阶段1复刻优化：连接测试、/object_info 刷新模型/采样器/调度器/VAE/CLIP/LORA列表、工作流预设、通用占位符 %xxx% 和 {{xxx}}、自动补丁常见节点、任务队列、取消全部、并发控制、多图批量、点击预览、双击重做。\n\n0.1.0\n基于 st-chatu8 拆分出的精简 ComfyUI 连接插件，保留聊天标记触发、工作流预设、生图轮询、图片插入楼层。"
 }
