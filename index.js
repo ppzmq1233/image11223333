@@ -98,6 +98,8 @@ function defaultSettings() {
         vaes: [],
         clips: [],
         loras: [],
+        selectedLoras: [],
+        uploadedImages: [],
         customPlaceholders: {},
         comfyuiProfiles: { '默认': { workflow: DEFAULT_WORKFLOW } },
         currentProfile: '默认',
@@ -118,6 +120,8 @@ function settings() {
     if (!s.currentPromptProfile || !s.promptProfiles[s.currentPromptProfile]) s.currentPromptProfile = Object.keys(s.promptProfiles)[0] || '默认';
     if (!s.promptReplaceProfiles || typeof s.promptReplaceProfiles !== 'object') s.promptReplaceProfiles = { '默认': { rules: '' } };
     if (!s.currentPromptReplaceProfile || !s.promptReplaceProfiles[s.currentPromptReplaceProfile]) s.currentPromptReplaceProfile = Object.keys(s.promptReplaceProfiles)[0] || '默认';
+    if (!Array.isArray(s.selectedLoras)) s.selectedLoras = [];
+    if (!Array.isArray(s.uploadedImages)) s.uploadedImages = [];
     if (!s.customPlaceholders || typeof s.customPlaceholders !== 'object') s.customPlaceholders = {};
     return s;
 }
@@ -270,6 +274,33 @@ function buildFinalNegativePrompt() {
     ]);
 }
 
+function buildExtraContext() {
+    const s = settings();
+    const ctx = {};
+    const selected = Array.isArray(s.selectedLoras) ? s.selectedLoras : [];
+    ctx.lora_tags = selected.map(l => l.trigger || '').filter(Boolean).join(', ');
+    ctx.lora_names = selected.map(l => l.name || '').filter(Boolean).join(',');
+    ctx.lora_json = JSON.stringify(selected);
+    selected.forEach((lora, index) => {
+        const n = index + 1;
+        ctx[`lora_${n}_name`] = lora.name || '';
+        ctx[`lora_${n}_model_strength`] = lora.modelStrength ?? 1;
+        ctx[`lora_${n}_clip_strength`] = lora.clipStrength ?? 1;
+        ctx[`lora_${n}_trigger`] = lora.trigger || '';
+    });
+    const images = Array.isArray(s.uploadedImages) ? s.uploadedImages : [];
+    ctx.images_json = JSON.stringify(images);
+    images.forEach((img, index) => {
+        const n = index + 1;
+        ctx[`image_${n}`] = img.name || '';
+        ctx[`image_${n}_filename`] = img.name || '';
+        ctx[`image_${n}_subfolder`] = img.subfolder || '';
+        ctx[`image_${n}_type`] = img.type || 'input';
+        ctx[`image_${n}_json`] = JSON.stringify(img);
+    });
+    return ctx;
+}
+
 function buildContext(rawPrompt, overrides = {}) {
     const s = settings();
     const seed = Number(overrides.seed ?? s.seed);
@@ -290,6 +321,7 @@ function buildContext(rawPrompt, overrides = {}) {
         vae_name: overrides.vaeName ?? s.vaeName ?? '',
         clip_name: overrides.clipName ?? s.clipName ?? '',
         profile: s.currentProfile,
+        ...buildExtraContext(),
         ...s.customPlaceholders,
     };
 }
@@ -333,6 +365,11 @@ function autoPatchWorkflow(workflow, ctx) {
         if (node.class_type === 'CheckpointLoaderSimple' && node.inputs.ckpt_name !== undefined && ctx.model_name) node.inputs.ckpt_name = ctx.model_name;
         if (node.class_type === 'VAELoader' && node.inputs.vae_name !== undefined && ctx.vae_name) node.inputs.vae_name = ctx.vae_name;
         if (node.class_type === 'CLIPLoader' && node.inputs.clip_name !== undefined && ctx.clip_name) node.inputs.clip_name = ctx.clip_name;
+        if (node.class_type === 'LoraLoader' && node.inputs.lora_name !== undefined && ctx.lora_1_name) {
+            node.inputs.lora_name = ctx.lora_1_name;
+            if (node.inputs.strength_model !== undefined) node.inputs.strength_model = Number(ctx.lora_1_model_strength || 1);
+            if (node.inputs.strength_clip !== undefined) node.inputs.strength_clip = Number(ctx.lora_1_clip_strength || 1);
+        }
     });
     return workflow;
 }
@@ -409,6 +446,24 @@ async function interruptComfy() {
     const base = normalizeUrl(settings().comfyuiUrl);
     if (!base) return;
     try { await fetch(`${base}/api/interrupt`, { method: 'POST', headers: headers() }); } catch (error) { debug('interrupt failed', error); }
+}
+
+async function uploadImageToComfy(file, slotName = '') {
+    const base = normalizeUrl(settings().comfyuiUrl);
+    if (!base) throw new Error('ComfyUI 地址为空');
+    const form = new FormData();
+    form.append('image', file, file.name);
+    form.append('overwrite', 'true');
+    const response = await fetch(`${base}/upload/image`, { method: 'POST', body: form });
+    if (!response.ok) throw new Error(`上传失败 ${response.status}: ${await response.text()}`);
+    const json = await response.json();
+    return {
+        slot: slotName || file.name,
+        name: json.name || file.name,
+        subfolder: json.subfolder || '',
+        type: json.type || 'input',
+        originalName: file.name,
+    };
 }
 
 const queue = {
@@ -542,12 +597,20 @@ function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
 }
 
+function renderLoraChips(list = []) {
+    return (Array.isArray(list) ? list : []).map((lora, index) => `<span class="cc-chip" data-lora-index="${index}">${escapeHtml(lora.name)} <small>m:${escapeHtml(lora.modelStrength ?? 1)} c:${escapeHtml(lora.clipStrength ?? 1)}</small>${lora.trigger ? ` <em>${escapeHtml(lora.trigger)}</em>` : ''}<button data-remove-lora="${index}">×</button></span>`).join('') || '<span class="cc-empty">未选择 LORA</span>';
+}
+
+function renderImageChips(list = []) {
+    return (Array.isArray(list) ? list : []).map((img, index) => `<span class="cc-chip" data-image-index="${index}">${escapeHtml(img.slot || img.name)} <small>${escapeHtml(img.name)}</small><button data-remove-image="${index}">×</button></span>`).join('') || '<span class="cc-empty">未上传图片</span>';
+}
+
 function openPanel() {
     $(`#${PANEL_ID}`).remove();
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.3.0</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.4.0</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -560,6 +623,16 @@ function openPanel() {
       <div class="cc-grid two"><label>模型<select id="cc-modelName" class="cc-select">${optionList(s.models, s.modelName)}</select></label><label>采样器<select id="cc-samplerName" class="cc-select">${optionList(s.samplers, s.samplerName)}</select></label></div>
       <div class="cc-grid two"><label>调度器<select id="cc-scheduler" class="cc-select">${optionList(s.schedulers, s.scheduler)}</select></label><label>VAE<select id="cc-vaeName" class="cc-select">${optionList(s.vaes, s.vaeName)}</select></label></div>
       <label>CLIP<select id="cc-clipName" class="cc-select">${optionList(s.clips, s.clipName)}</select></label>
+    </section>
+    <section><h3>LORA 库</h3>
+      <div class="cc-row"><select id="cc-loraSelect" class="cc-select">${optionList(s.loras, '')}</select><input id="cc-loraModelStrength" class="cc-input short" type="number" step="0.05" value="1" title="model strength"><input id="cc-loraClipStrength" class="cc-input short" type="number" step="0.05" value="1" title="clip strength"><input id="cc-loraTrigger" class="cc-input" placeholder="触发词，可空"><button id="cc-addLora" class="cc-btn">添加 LORA</button></div>
+      <div id="cc-selectedLoras" class="cc-chipbox">${renderLoraChips(s.selectedLoras)}</div>
+      <p class="cc-help">占位符：%lora_tags%、%lora_names%、%lora_json%、%lora_1_name%、%lora_1_model_strength%、%lora_1_clip_strength%、%lora_1_trigger%。自动补丁会填充第一个 LoraLoader；复数 LORA 推荐在工作流中预留多节点并使用 lora_2/lora_3 占位符。</p>
+    </section>
+    <section><h3>上传图片槽位</h3>
+      <div class="cc-row"><input id="cc-imageSlot" class="cc-input" placeholder="槽位名，如 ref / pose / mask"><input id="cc-imageFile" type="file" accept="image/*" class="cc-input"><button id="cc-uploadImage" class="cc-btn">上传到 ComfyUI</button></div>
+      <div id="cc-uploadedImages" class="cc-chipbox">${renderImageChips(s.uploadedImages)}</div>
+      <p class="cc-help">占位符：%image_1%、%image_1_filename%、%image_1_subfolder%、%image_1_type%、%image_1_json%、%images_json%。上传结果可填入 LoadImage / IPA / inpaint 工作流节点。</p>
     </section>
     <section><h3>生成参数</h3>
       <div class="cc-grid three"><label>宽<input id="cc-width" type="number" class="cc-input" value="${escapeHtml(s.width)}"></label><label>高<input id="cc-height" type="number" class="cc-input" value="${escapeHtml(s.height)}"></label><label>步数<input id="cc-steps" type="number" class="cc-input" value="${escapeHtml(s.steps)}"></label></div>
@@ -712,6 +785,46 @@ function bindPanel($panel) {
         .on('click.cc', '#cc-test', async () => {
             try { readPanel(); await testComfyConnection(); toastr?.success('ComfyUI 连接成功'); }
             catch (error) { toastr?.error(error.message); }
+        })
+        .on('click.cc', '#cc-addLora', () => {
+            const s = settings();
+            const name = $('#cc-loraSelect').val();
+            if (!name) return toastr?.warning('没有可添加的 LORA，请先刷新列表');
+            s.selectedLoras.push({
+                name,
+                modelStrength: Number($('#cc-loraModelStrength').val()) || 1,
+                clipStrength: Number($('#cc-loraClipStrength').val()) || 1,
+                trigger: $('#cc-loraTrigger').val() || '',
+            });
+            save();
+            $('#cc-selectedLoras').html(renderLoraChips(s.selectedLoras));
+        })
+        .on('click.cc', '[data-remove-lora]', function () {
+            const s = settings();
+            const index = Number($(this).attr('data-remove-lora'));
+            s.selectedLoras.splice(index, 1);
+            save();
+            $('#cc-selectedLoras').html(renderLoraChips(s.selectedLoras));
+        })
+        .on('click.cc', '#cc-uploadImage', async () => {
+            try {
+                readPanel();
+                const file = $('#cc-imageFile')[0]?.files?.[0];
+                if (!file) return toastr?.warning('请选择图片文件');
+                const slot = $('#cc-imageSlot').val();
+                const result = await uploadImageToComfy(file, slot);
+                settings().uploadedImages.push(result);
+                save();
+                $('#cc-uploadedImages').html(renderImageChips(settings().uploadedImages));
+                toastr?.success('图片已上传到 ComfyUI');
+            } catch (error) { toastr?.error(error.message); }
+        })
+        .on('click.cc', '[data-remove-image]', function () {
+            const s = settings();
+            const index = Number($(this).attr('data-remove-image'));
+            s.uploadedImages.splice(index, 1);
+            save();
+            $('#cc-uploadedImages').html(renderImageChips(s.uploadedImages));
         })
         .on('click.cc', '#cc-refresh', async () => {
             try { readPanel(); await refreshComfyObjects(); toastr?.success('列表已刷新'); $panel.remove(); openPanel(); }

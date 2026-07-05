@@ -64,6 +64,10 @@
     border-radius: 4px;
     font: inherit;
 }
+#st-chatu8-comfy-settings-panel .cc-input.short {
+    max-width: 90px;
+    flex: 0 0 90px;
+}
 #st-chatu8-comfy-settings-panel .cc-textarea.mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 12px;
@@ -101,6 +105,35 @@
     margin: 6px 0 0;
     line-height: 1.5;
 }
+#st-chatu8-comfy-settings-panel .cc-chipbox {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+    border: 1px dashed var(--SmartThemeBorderColor, #555);
+    border-radius: 6px;
+    min-height: 30px;
+}
+#st-chatu8-comfy-settings-panel .cc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(74, 120, 255, 0.18);
+    border: 1px solid rgba(74, 120, 255, 0.45);
+    font-size: 12px;
+}
+#st-chatu8-comfy-settings-panel .cc-chip small,
+#st-chatu8-comfy-settings-panel .cc-chip em { opacity: 0.75; }
+#st-chatu8-comfy-settings-panel .cc-chip button {
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.16);
+    color: inherit;
+    cursor: pointer;
+}
+#st-chatu8-comfy-settings-panel .cc-empty { opacity: 0.55; font-size: 12px; }
 .st-chatu8-comfy-image {
     display: block;
     max-width: 100%;
@@ -124,5 +157,9 @@
     }
     #st-chatu8-comfy-settings-panel .cc-row {
         flex-wrap: wrap;
+    }
+    #st-chatu8-comfy-settings-panel .cc-input.short {
+        max-width: none;
+        flex: 1 1 90px;
     }
 }
