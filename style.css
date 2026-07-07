@@ -173,6 +173,30 @@
     cursor: pointer;
 }
 .st-chatu8-comfy-quick-menu button:hover { background: rgba(255,255,255,0.1); }
+.st-chatu8-comfy-inline-button-wrap {
+    display: inline-flex;
+    margin: 4px 6px;
+    vertical-align: middle;
+}
+.image-tag-button.st-chatu8-image-button,
+.st-chatu8-comfy-inline-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(74, 120, 255, 0.55);
+    background: rgba(74, 120, 255, 0.18);
+    color: inherit;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.4;
+}
+.image-tag-button.st-chatu8-image-button:hover,
+.st-chatu8-comfy-inline-button:hover {
+    background: rgba(74, 120, 255, 0.32);
+}
 .st-chatu8-comfy-result {
     display: inline-block;
     max-width: 100%;

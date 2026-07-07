@@ -142,6 +142,9 @@ function defaultSettings() {
         showImageActions: true,
         compressToJpeg: false,
         jpegQuality: 0.9,
+        showInlineTagButtons: true,
+        inlineButtonText: '生成图片',
+        autoGenerateOnMessage: false,
         debugMode: false,
         models: [],
         samplers: [],
@@ -684,9 +687,53 @@ function extractPromptBlocks(text) {
     return list;
 }
 
+function injectInlineTagButtons(root = document) {
+    const s = settings();
+    if (!s.scriptEnabled || !s.showInlineTagButtons || !s.startTag || !s.endTag) return;
+    const elements = root.querySelectorAll ? root.querySelectorAll('.mes_text') : [];
+    const re = new RegExp(escapeRegex(s.startTag) + '([\\s\\S]*?)' + escapeRegex(s.endTag), 'g');
+    for (const el of elements) {
+        if (el.dataset?.stComfyInlineProcessed === 'true' && el.dataset.stComfyInlineLength === String(el.textContent?.length || 0)) continue;
+        const text = el.textContent || '';
+        const matches = [...text.matchAll(re)];
+        if (!matches.length) continue;
+        el.querySelectorAll('.st-chatu8-comfy-inline-button-wrap').forEach(x => x.remove());
+        matches.forEach((match, index) => {
+            const raw = match[0];
+            const promptText = match[1].trim();
+            if (!promptText) return;
+            const requestId = `cc-inline-${Date.now()}-${Math.random().toString(36).slice(2)}-${index}`;
+            const wrap = document.createElement('span');
+            wrap.className = 'st-chatu8-comfy-inline-button-wrap';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'image-tag-button st-chatu8-image-button st-chatu8-comfy-inline-button';
+            btn.textContent = s.inlineButtonText || '生成图片';
+            btn.dataset.link = raw;
+            btn.dataset.imageTag = raw;
+            btn.dataset.prompt = promptText;
+            btn.dataset.requestId = requestId;
+            wrap.appendChild(btn);
+            el.appendChild(wrap);
+        });
+        if (el.dataset) {
+            el.dataset.stComfyInlineProcessed = 'true';
+            el.dataset.stComfyInlineLength = String(el.textContent?.length || 0);
+        }
+    }
+}
+
+function scheduleInlineButtonScan() {
+    injectInlineTagButtons(document);
+    setTimeout(() => injectInlineTagButtons(document), 500);
+    setTimeout(() => injectInlineTagButtons(document), 1500);
+}
+
 async function processMessage(messageId) {
     const s = settings();
+    scheduleInlineButtonScan();
     if (!s.scriptEnabled) return;
+    if (!s.autoGenerateOnMessage) return;
     const context = getContext();
     const message = context.chat?.[messageId];
     if (!message || message.is_user) return;
@@ -730,13 +777,16 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.1</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.2</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
       <div class="cc-grid two"><label>开始标记<input id="cc-startTag" class="cc-input" value="${escapeHtml(s.startTag)}"></label><label>结束标记<input id="cc-endTag" class="cc-input" value="${escapeHtml(s.endTag)}"></label></div>
       <div class="cc-grid two"><label>批量分隔符<input id="cc-batchDelimiter" class="cc-input" value="${escapeHtml(String(s.batchDelimiter).replace(/\n/g, '\\n'))}"></label><label>并发数<input id="cc-maxConcurrent" type="number" min="1" max="8" class="cc-input" value="${escapeHtml(s.maxConcurrent)}"></label></div>
       <label class="cc-check"><input id="cc-allowBatch" type="checkbox" ${s.allowBatch ? 'checked' : ''}> 一个标记内允许批量提示词</label>
+      <label class="cc-check"><input id="cc-showInlineTagButtons" type="checkbox" ${s.showInlineTagButtons ? 'checked' : ''}> 像原插件一样在消息标签处显示“生成图片”按钮</label>
+      <label class="cc-check"><input id="cc-autoGenerateOnMessage" type="checkbox" ${s.autoGenerateOnMessage ? 'checked' : ''}> 收到消息后自动生图（关闭时点击消息内按钮手动生成）</label>
+      <label>消息内按钮文本<input id="cc-inlineButtonText" class="cc-input" value="${escapeHtml(s.inlineButtonText)}"></label>
       <label class="cc-check"><input id="cc-showImageActions" type="checkbox" ${s.showImageActions ? 'checked' : ''}> 在生成图下方显示操作按钮</label>
       <label class="cc-check"><input id="cc-compressToJpeg" type="checkbox" ${s.compressToJpeg ? 'checked' : ''}> 图片插入楼层前压缩为 JPEG</label>
       <label>JPEG 质量<input id="cc-jpegQuality" class="cc-input" type="number" step="0.05" min="0.1" max="1" value="${escapeHtml(s.jpegQuality)}"></label>
@@ -807,6 +857,9 @@ function readPanel() {
     s.endTag = $('#cc-endTag').val();
     s.batchDelimiter = $('#cc-batchDelimiter').val();
     s.allowBatch = $('#cc-allowBatch').prop('checked');
+    s.showInlineTagButtons = $('#cc-showInlineTagButtons').prop('checked');
+    s.autoGenerateOnMessage = $('#cc-autoGenerateOnMessage').prop('checked');
+    s.inlineButtonText = $('#cc-inlineButtonText').val() || '生成图片';
     s.showImageActions = $('#cc-showImageActions').prop('checked');
     s.compressToJpeg = $('#cc-compressToJpeg').prop('checked');
     s.jpegQuality = Number($('#cc-jpegQuality').val()) || 0.9;
@@ -1141,6 +1194,15 @@ function bindChatInteractions() {
             const src = $(this).attr('src');
             if (src) openPreview(src);
         })
+        .on('click.stComfyImage', '.st-chatu8-comfy-inline-button', function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            const prompt = $(this).attr('data-prompt') || '';
+            const messageId = getMessageIdFromElement($(this));
+            if (!prompt) return toastr?.warning('没有找到按钮提示词');
+            queue.push({ messageId, prompt, overrides: {} });
+            toastr?.info('已加入生图任务');
+        })
         .on('dblclick.stComfyImage', '.st-chatu8-comfy-image', function () {
             rerunFromElement($(this), 'normal');
         })
@@ -1183,17 +1245,27 @@ function bindEvents() {
     try {
         tavern.eventSource?.on?.(tavern.event_types?.MESSAGE_RECEIVED, id => processMessage(Number(id)));
         tavern.eventSource?.on?.(tavern.event_types?.MESSAGE_UPDATED, id => processMessage(Number(id)));
+        tavern.eventSource?.on?.(tavern.event_types?.GENERATION_ENDED, () => scheduleInlineButtonScan());
     } catch (error) {
         console.warn(`[${EXT_NAME}] event bind failed`, error);
     }
+}
+
+function observeChatForInlineButtons() {
+    const target = document.getElementById('chat') || document.body;
+    if (!target || window.__stComfyInlineObserver) return;
+    window.__stComfyInlineObserver = new MutationObserver(() => scheduleInlineButtonScan());
+    window.__stComfyInlineObserver.observe(target, { childList: true, subtree: true, characterData: true });
 }
 
 jQuery(() => {
     settings();
     bindEvents();
     bindChatInteractions();
+    observeChatForInlineButtons();
     addEntryButton();
     addChatQuickButton();
+    scheduleInlineButtonScan();
     setTimeout(addChatQuickButton, 1500);
     setTimeout(addChatQuickButton, 5000);
     log('loaded');
