@@ -7,6 +7,7 @@ const EXT_NAME = 'st-chatu8-comfy';
 const PANEL_ID = 'st-chatu8-comfy-settings-panel';
 const ENTRY_ID = 'st-chatu8-comfy-entry';
 const CHAT_BUTTON_ID = 'st-chatu8-comfy-chat-button';
+const LEFT_MENU_ENTRY_ID = 'st-chatu8-comfy-left-menu-entry';
 const QUICK_MENU_ID = 'st-chatu8-comfy-quick-menu';
 
 const DEFAULT_EDIT_WORKFLOW = JSON.stringify({
@@ -777,7 +778,7 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.2</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.3</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -1093,6 +1094,30 @@ function addEntryButton() {
     $entry.on('click', 'button', openPanel);
 }
 
+function addLeftMenuEntry() {
+    if ($(`#${LEFT_MENU_ENTRY_ID}`).length) return;
+    const $entry = $(`<div id="${LEFT_MENU_ENTRY_ID}" class="list-group-item flex-container flexGap5 interactable st-chatu8-comfy-left-menu-entry" tabindex="0" title="打开 ComfyUI 文生图设置">
+        <i class="fa-solid fa-image"></i>
+        <span>ComfyUI 文生图</span>
+    </div>`);
+    const anchors = ['#extensionsMenu', '#extensions_menu', '#extensionsMenu .list-group', '#extensionsMenuDrawer .inline-drawer-content', '#left-nav-panel', '#left-nav'];
+    let inserted = false;
+    for (const selector of anchors) {
+        const $anchor = $(selector).first();
+        if ($anchor.length) {
+            $anchor.append($entry);
+            inserted = true;
+            break;
+        }
+    }
+    if (!inserted) return setTimeout(addLeftMenuEntry, 1200);
+    $entry.on('click keydown', event => {
+        if (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        openPanel();
+    });
+}
+
 function getPromptTextareaValue() {
     const selectors = ['#send_textarea', '#send_textarea textarea', 'textarea[name="send_textarea"]', '#send_form textarea', '#send_form [contenteditable="true"]'];
     for (const selector of selectors) {
@@ -1264,8 +1289,11 @@ jQuery(() => {
     bindChatInteractions();
     observeChatForInlineButtons();
     addEntryButton();
+    addLeftMenuEntry();
     addChatQuickButton();
     scheduleInlineButtonScan();
+    setTimeout(addLeftMenuEntry, 1500);
+    setTimeout(addLeftMenuEntry, 5000);
     setTimeout(addChatQuickButton, 1500);
     setTimeout(addChatQuickButton, 5000);
     log('loaded');

@@ -134,6 +134,17 @@
     cursor: pointer;
 }
 #st-chatu8-comfy-settings-panel .cc-empty { opacity: 0.55; font-size: 12px; }
+.st-chatu8-comfy-left-menu-entry {
+    cursor: pointer;
+    align-items: center;
+    gap: 6px;
+}
+.st-chatu8-comfy-left-menu-entry:hover {
+    background: rgba(74, 120, 255, 0.12);
+}
+.st-chatu8-comfy-left-menu-entry i {
+    color: #6ea8ff;
+}
 .st-chatu8-comfy-chat-button {
     display: inline-flex !important;
     align-items: center;
