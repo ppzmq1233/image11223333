@@ -9,6 +9,7 @@ const ENTRY_ID = 'st-chatu8-comfy-entry';
 const CHAT_BUTTON_ID = 'st-chatu8-comfy-chat-button';
 const LEFT_MENU_ENTRY_ID = 'st-chatu8-comfy-left-menu-entry';
 const COMFY_FAB_ID = 'st-chatu8-comfy-fab';
+const WAND_BUTTON_ID = 'st-chatu8-comfy-wand-button';
 const QUICK_MENU_ID = 'st-chatu8-comfy-quick-menu';
 
 const DEFAULT_EDIT_WORKFLOW = JSON.stringify({
@@ -779,7 +780,7 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.5</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.6</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -1140,6 +1141,60 @@ function addComfyFab() {
     });
 }
 
+function addWandMenuButton() {
+    if ($(`#${WAND_BUTTON_ID}`).length) return;
+    const $button = $(`<div id="${WAND_BUTTON_ID}" class="list-group-item flex-container flexGap5 interactable st-chatu8-comfy-wand-button" tabindex="0" role="listitem" title="ComfyUI 文生图">
+        <i class="fa-solid fa-paintbrush"></i>
+        <span>ComfyUI 文生图</span>
+    </div>`);
+    const anchorSelectors = [
+        '#ai-menu-btn',
+        '#so-wand-button',
+        '#outfit-mgr-ext-btn-v4',
+        '#translate_wand_container',
+        '#objective_wand_container',
+        '#token_counter_wand_container',
+        '#chess_wand_container',
+        '.extension_container.interactable',
+        '.list-group-item.flex-container.flexGap5.interactable[role="listitem"]',
+    ];
+    for (const selector of anchorSelectors) {
+        const $anchor = $(selector).last();
+        if (!$anchor.length) continue;
+        const $parent = $anchor.parent();
+        if (!$parent.length) continue;
+        if ($anchor.attr('id') === 'ai-menu-btn') {
+            $button.insertBefore($anchor);
+        } else {
+            $button.insertAfter($anchor);
+        }
+        debug('wand button inserted near', selector);
+        bindWandMenuButton($button);
+        return;
+    }
+    const $script = $('script[id^="third-party_"]').first();
+    if ($script.length) {
+        $script.before($button);
+        bindWandMenuButton($button);
+        return;
+    }
+    setTimeout(addWandMenuButton, 1200);
+}
+
+function bindWandMenuButton($button) {
+    $button.off('.stComfyWand')
+        .on('click.stComfyWand', openPanel)
+        .on('keydown.stComfyWand', event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            openPanel();
+        })
+        .on('contextmenu.stComfyWand', event => {
+            event.preventDefault();
+            openQuickMenu(event.clientX, event.clientY);
+        });
+}
+
 function addLeftMenuEntry() {
     if ($(`#${LEFT_MENU_ENTRY_ID}`).length) return;
     const $entry = $(`<div id="${LEFT_MENU_ENTRY_ID}" class="list-group-item flex-container flexGap5 interactable st-chatu8-comfy-left-menu-entry" tabindex="0" title="打开 ComfyUI 文生图设置">
@@ -1335,13 +1390,16 @@ jQuery(() => {
     bindChatInteractions();
     observeChatForInlineButtons();
     addEntryButton();
+    addWandMenuButton();
     addComfyFab();
     addLeftMenuEntry();
     addChatQuickButton();
     scheduleInlineButtonScan();
     setTimeout(addLeftMenuEntry, 1500);
+    setTimeout(addWandMenuButton, 1500);
     setTimeout(addComfyFab, 1500);
     setTimeout(addLeftMenuEntry, 5000);
+    setTimeout(addWandMenuButton, 5000);
     setTimeout(addComfyFab, 5000);
     setTimeout(addChatQuickButton, 1500);
     setTimeout(addChatQuickButton, 5000);

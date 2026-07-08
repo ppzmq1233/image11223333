@@ -168,6 +168,16 @@
 .st-chatu8-comfy-left-menu-entry i {
     color: #6ea8ff;
 }
+#st-chatu8-comfy-wand-button.st-chatu8-comfy-wand-button {
+    align-items: center;
+    gap: 6px;
+}
+#st-chatu8-comfy-wand-button.st-chatu8-comfy-wand-button i {
+    color: #6ea8ff;
+}
+#st-chatu8-comfy-wand-button.st-chatu8-comfy-wand-button:hover {
+    background: rgba(74, 120, 255, 0.12);
+}
 .st-chatu8-comfy-chat-button {
     display: inline-flex !important;
     align-items: center;
