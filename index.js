@@ -780,7 +780,7 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.6</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.7</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -1142,7 +1142,7 @@ function addComfyFab() {
 }
 
 function addWandMenuButton() {
-    if ($(`#${WAND_BUTTON_ID}`).length) return;
+    if ($(`#${WAND_BUTTON_ID}`).length) return true;
     const $button = $(`<div id="${WAND_BUTTON_ID}" class="list-group-item flex-container flexGap5 interactable st-chatu8-comfy-wand-button" tabindex="0" role="listitem" title="ComfyUI 文生图">
         <i class="fa-solid fa-paintbrush"></i>
         <span>ComfyUI 文生图</span>
@@ -1155,11 +1155,15 @@ function addWandMenuButton() {
         '#objective_wand_container',
         '#token_counter_wand_container',
         '#chess_wand_container',
-        '.extension_container.interactable',
+        '#notebook_wand_container',
+        '#emulatorjs_wand_container',
+        '#dice_wand_container',
+        '#bai_bai_toolkit_floor_directory_wand_container',
+        '.extension_container.interactable[tabindex="0"]',
         '.list-group-item.flex-container.flexGap5.interactable[role="listitem"]',
     ];
     for (const selector of anchorSelectors) {
-        const $anchor = $(selector).last();
+        const $anchor = $(selector).filter(':visible').last().length ? $(selector).filter(':visible').last() : $(selector).last();
         if (!$anchor.length) continue;
         const $parent = $anchor.parent();
         if (!$parent.length) continue;
@@ -1168,17 +1172,25 @@ function addWandMenuButton() {
         } else {
             $button.insertAfter($anchor);
         }
+        bindWandMenuButton($button);
         debug('wand button inserted near', selector);
-        bindWandMenuButton($button);
-        return;
+        return true;
     }
-    const $script = $('script[id^="third-party_"]').first();
-    if ($script.length) {
-        $script.before($button);
-        bindWandMenuButton($button);
-        return;
-    }
+    return false;
+}
+
+function scheduleWandButtonScan() {
+    addWandMenuButton();
+    setTimeout(addWandMenuButton, 100);
+    setTimeout(addWandMenuButton, 500);
     setTimeout(addWandMenuButton, 1200);
+}
+
+function observeWandMenu() {
+    if (window.__stComfyWandObserver) return;
+    window.__stComfyWandObserver = new MutationObserver(() => scheduleWandButtonScan());
+    window.__stComfyWandObserver.observe(document.body, { childList: true, subtree: true });
+    $(document).on('click.stComfyWandScan', '#extensionsMenuButton, #extensions_button, #options_button, #extensionsMenu, .fa-magic-wand-sparkles, .fa-wand-magic-sparkles, .drawer-toggle', () => scheduleWandButtonScan());
 }
 
 function bindWandMenuButton($button) {
@@ -1390,16 +1402,17 @@ jQuery(() => {
     bindChatInteractions();
     observeChatForInlineButtons();
     addEntryButton();
-    addWandMenuButton();
+    observeWandMenu();
+    scheduleWandButtonScan();
     addComfyFab();
     addLeftMenuEntry();
     addChatQuickButton();
     scheduleInlineButtonScan();
     setTimeout(addLeftMenuEntry, 1500);
-    setTimeout(addWandMenuButton, 1500);
+    setTimeout(scheduleWandButtonScan, 1500);
     setTimeout(addComfyFab, 1500);
     setTimeout(addLeftMenuEntry, 5000);
-    setTimeout(addWandMenuButton, 5000);
+    setTimeout(scheduleWandButtonScan, 5000);
     setTimeout(addComfyFab, 5000);
     setTimeout(addChatQuickButton, 1500);
     setTimeout(addChatQuickButton, 5000);
