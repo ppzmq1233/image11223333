@@ -134,6 +134,29 @@
     cursor: pointer;
 }
 #st-chatu8-comfy-settings-panel .cc-empty { opacity: 0.55; font-size: 12px; }
+#st-chatu8-comfy-fab.st-chatu8-comfy-fab {
+    position: fixed;
+    left: 14px;
+    bottom: 78px;
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    border-radius: 14px;
+    border: 1px solid rgba(110, 168, 255, 0.55);
+    background: linear-gradient(135deg, rgba(74,120,255,0.92), rgba(165,95,255,0.92));
+    color: #fff;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.36);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+#st-chatu8-comfy-fab.st-chatu8-comfy-fab:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 14px 34px rgba(0,0,0,0.42);
+}
+#st-chatu8-comfy-fab.st-chatu8-comfy-fab i { font-size: 20px; }
 .st-chatu8-comfy-left-menu-entry {
     cursor: pointer;
     align-items: center;

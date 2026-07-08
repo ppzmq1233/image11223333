@@ -8,6 +8,7 @@ const PANEL_ID = 'st-chatu8-comfy-settings-panel';
 const ENTRY_ID = 'st-chatu8-comfy-entry';
 const CHAT_BUTTON_ID = 'st-chatu8-comfy-chat-button';
 const LEFT_MENU_ENTRY_ID = 'st-chatu8-comfy-left-menu-entry';
+const COMFY_FAB_ID = 'st-chatu8-comfy-fab';
 const QUICK_MENU_ID = 'st-chatu8-comfy-quick-menu';
 
 const DEFAULT_EDIT_WORKFLOW = JSON.stringify({
@@ -778,7 +779,7 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.3</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.4</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -1094,6 +1095,19 @@ function addEntryButton() {
     $entry.on('click', 'button', openPanel);
 }
 
+function addComfyFab() {
+    if ($(`#${COMFY_FAB_ID}`).length) return;
+    const $fab = $(`<div id="${COMFY_FAB_ID}" class="st-chatu8-comfy-fab" title="ComfyUI 文生图设置">
+        <i class="fa-solid fa-paintbrush"></i>
+    </div>`);
+    $('body').append($fab);
+    $fab.on('click', openPanel);
+    $fab.on('contextmenu', event => {
+        event.preventDefault();
+        openQuickMenu(event.clientX, event.clientY);
+    });
+}
+
 function addLeftMenuEntry() {
     if ($(`#${LEFT_MENU_ENTRY_ID}`).length) return;
     const $entry = $(`<div id="${LEFT_MENU_ENTRY_ID}" class="list-group-item flex-container flexGap5 interactable st-chatu8-comfy-left-menu-entry" tabindex="0" title="打开 ComfyUI 文生图设置">
@@ -1289,11 +1303,14 @@ jQuery(() => {
     bindChatInteractions();
     observeChatForInlineButtons();
     addEntryButton();
+    addComfyFab();
     addLeftMenuEntry();
     addChatQuickButton();
     scheduleInlineButtonScan();
     setTimeout(addLeftMenuEntry, 1500);
+    setTimeout(addComfyFab, 1500);
     setTimeout(addLeftMenuEntry, 5000);
+    setTimeout(addComfyFab, 5000);
     setTimeout(addChatQuickButton, 1500);
     setTimeout(addChatQuickButton, 5000);
     log('loaded');
