@@ -779,7 +779,7 @@ function openPanel() {
     const s = settings();
     const $panel = $(`
 <div id="${PANEL_ID}" class="st-chatu8-comfy-panel">
-  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.4</small></h2><span class="cc-close">&times;</span></div>
+  <div class="cc-header"><h2>ComfyUI 生图桥 <small>v0.6.5</small></h2><span class="cc-close">&times;</span></div>
   <div class="cc-body">
     <section><h3>主要设置</h3>
       <label class="cc-check"><input id="cc-scriptEnabled" type="checkbox" ${s.scriptEnabled ? 'checked' : ''}> 启用插件</label>
@@ -1087,12 +1087,44 @@ function bindPanel($panel) {
 }
 
 function addEntryButton() {
-    const $root = $('#extensions_settings');
-    if (!$root.length) return setTimeout(addEntryButton, 1200);
     if ($(`#${ENTRY_ID}`).length) return;
-    const $entry = $(`<div id="${ENTRY_ID}" class="inline-drawer"><button class="menu_button" type="button"><i class="fa-solid fa-image"></i> ComfyUI 生图桥</button></div>`);
-    $root.append($entry);
-    $entry.on('click', 'button', openPanel);
+    const $entry = $(`<div id="${ENTRY_ID}" class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header fa-solid fa-chevron-right" data-target-st-chatu8-comfy>
+            <i class="fa-solid fa-image"></i> ComfyUI 生图桥
+        </div>
+        <div class="inline-drawer-content" style="display:none">
+            <button class="menu_button st-chatu8-comfy-entry-btn" type="button"><i class="fa-solid fa-gear"></i> 打开文生图设置</button>
+        </div>
+    </div>`);
+    const anchors = [
+        '#extensions_settings',
+        '#extensions_settings2',
+        '#extensions_settings .inline-drawer-content',
+        '#extensions_settings2 .inline-drawer-content',
+        '#extensionsSettings',
+        '#extensions_menu',
+        '#settings_block',
+        'div[id^="extensions_settings"]',
+    ];
+    let inserted = false;
+    for (const selector of anchors) {
+        const $anchor = $(selector).first();
+        if ($anchor.length) {
+            $anchor.append($entry);
+            inserted = true;
+            debug('entry inserted into', selector);
+            break;
+        }
+    }
+    if (!inserted) return setTimeout(addEntryButton, 1200);
+    $entry
+        .on('click', '.inline-drawer-toggle', function () {
+            $(this).toggleClass('isShowing');
+            const $content = $(this).siblings('.inline-drawer-content');
+            const isOpen = $(this).hasClass('isShowing');
+            if ($content.length) $content.toggle(isOpen);
+        })
+        .on('click', '.st-chatu8-comfy-entry-btn', openPanel);
 }
 
 function addComfyFab() {
